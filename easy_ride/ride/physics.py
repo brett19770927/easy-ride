@@ -58,8 +58,17 @@ def speed_from_power(
     f_rolling = GRAVITY * total_mass * crr * math.cos(slope_angle)
     resistive = f_gravity + f_rolling
 
-    # Initial guess
-    v = 5.0 if power > 0 else 0.1
+    # Initial guess — on downhill, start from freewheel speed (where
+    # gravity balances aero drag at zero power) to avoid Newton's method
+    # getting stuck in the wrong region of the cubic.
+    aero_coeff = 0.5 * AIR_DENSITY * cda
+    if resistive < 0 and aero_coeff > 0:
+        v_freewheel = math.sqrt(-resistive / aero_coeff)
+        v = v_freewheel + 2.0
+    elif power > 0:
+        v = 5.0
+    else:
+        v = 0.1
 
     for _ in range(max_iters):
         f_aero = 0.5 * AIR_DENSITY * cda * v * v
