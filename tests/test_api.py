@@ -106,3 +106,22 @@ class TestRouteAPI:
         data = response.json()
         assert data["name"] == "Mountain Climb"
         assert data["stats"]["total_ascent"] > 0
+
+    async def test_upload_with_custom_name(self, client):
+        gpx_data = (FIXTURES_DIR / "simple_loop.gpx").read_bytes()
+        response = await client.post(
+            "/api/routes",
+            files={"file": ("simple_loop.gpx", gpx_data, "application/gpx+xml")},
+            data={"name": "My Sunday Ride"},
+        )
+        assert response.status_code == 201
+        assert response.json()["name"] == "My Sunday Ride"
+
+    async def test_upload_without_name_uses_gpx_metadata(self, client):
+        gpx_data = (FIXTURES_DIR / "simple_loop.gpx").read_bytes()
+        response = await client.post(
+            "/api/routes",
+            files={"file": ("simple_loop.gpx", gpx_data, "application/gpx+xml")},
+        )
+        assert response.status_code == 201
+        assert response.json()["name"] == "Simple Loop"

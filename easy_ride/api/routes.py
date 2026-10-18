@@ -2,7 +2,8 @@ from __future__ import annotations
 
 from dataclasses import asdict
 
-from fastapi import APIRouter, Request, UploadFile, HTTPException
+from fastapi import APIRouter, Form, Request, UploadFile, HTTPException
+from typing import Optional
 
 from easy_ride.api.schemas import (
     RouteDetailResponse,
@@ -40,7 +41,11 @@ def _route_to_detail(route) -> RouteDetailResponse:
 
 
 @router.post("/routes", status_code=201, response_model=RouteMetadataResponse)
-async def upload_route(request: Request, file: UploadFile):
+async def upload_route(
+    request: Request,
+    file: UploadFile,
+    name: Optional[str] = Form(None),
+):
     content = await file.read()
     try:
         gpx_text = content.decode("utf-8")
@@ -49,7 +54,7 @@ async def upload_route(request: Request, file: UploadFile):
 
     filename = file.filename or ""
     try:
-        route = process_gpx(gpx_text, filename=filename)
+        route = process_gpx(gpx_text, name=name or "", filename=filename)
     except (GPXParseError, RouteProcessingError) as e:
         raise HTTPException(status_code=400, detail=str(e))
 
