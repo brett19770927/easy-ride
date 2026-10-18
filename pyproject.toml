@@ -1,0 +1,36 @@
+[project]
+name = "easy-ride"
+version = "0.1.0"
+description = "Virtual cycling app that simulates GPX routes on smart/dumb trainers via BLE"
+requires-python = ">=3.11"
+dependencies = [
+    "fastapi>=0.115",
+    "uvicorn[standard]>=0.30",
+    "python-multipart>=0.0.9",
+    "aiosqlite>=0.20",
+    "pycycling>=0.4",
+    "bleak>=0.22",
+    "sse-starlette>=2.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest",
+    "pytest-asyncio",
+    "pytest-cov",
+    "httpx",
+]
+
+[project.scripts]
+easy-ride = "easy_ride.api.app:run"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+
+[tool.setuptools.packages.find]
+include = ["easy_ride*"]
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
