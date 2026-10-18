@@ -25,7 +25,7 @@ pip install -e ".[dev]"
 ```
 
 ## Testing
-- `pytest -v` — 144 tests across 13 test files
+- `pytest -v` — tests across 18 test files
 - Tests use `tmp_path` for isolated SQLite DBs
 - API tests manually init DB since `ASGITransport` doesn't trigger ASGI lifespan
 - GPX test fixtures in `tests/fixtures/` (simple_loop.gpx, mountain_climb.gpx)
@@ -42,6 +42,7 @@ pip install -e ".[dev]"
   - `/api/rides/{id}/pause|resume|stop` — ride lifecycle control (PATCH)
   - `/api/rides/{id}/live` — SSE stream (real-time samples + stats)
   - `/api/devices/scan` — BLE device discovery
+  - `/api/profiles` — POST create, GET list, GET/{id} detail, PUT/{id} update, DELETE/{id}
   - `/api/settings` — GET/PUT user settings (FTP, weight, device IDs)
 
 ## Conventions
@@ -53,20 +54,30 @@ pip install -e ".[dev]"
 - Package discovery explicitly includes only `easy_ride*` (excludes `data/`)
 
 ## Architecture: BLE + Ride Engine
-- Abstract device interface via `typing.Protocol` (`TrainerDevice`, `HRMDevice`)
+- Abstract device interface via `typing.Protocol` (`TrainerDevice`, `HRMDevice`, `SpeedCadenceSensor`, `PowerMeterDevice`)
+- Device types: TRAINER (FTMS smart), POWER_METER (CPS standalone), SPEED_CADENCE (CSC), HRM
 - Real BLE (pycycling) and simulator both implement the same protocols
+- `ClassicTrainerAdapter` wraps speed/cadence + optional power meter into TrainerDevice protocol
 - Ride engine is a state machine: `idle → active ↔ paused → completed/cancelled`
-- 1Hz main loop: drain device data → update distance → find route point → set gradient → collect sample → publish SSE
+- **Virtual speed model**: power → `speed_from_power(power, gradient, mass)` → distance (all trainer types)
+- 1Hz main loop: drain device data → compute virtual speed → update distance → find route point → set gradient → collect sample → publish SSE
 - Active engines stored in-memory in `api/ride_routes._active_engines`
 - SSE live stream via `sse-starlette` with ping keepalive
 
+## Trainer Profiles
+- `TrainerProfile` dataclass: name, type (smart/classic/power_meter_only), device addresses, resistance_factor, wheel_circumference
+- CRUD in `db.py`: insert/fetch/list/update/delete + default profile support
+- API: `/api/profiles` — POST/GET/GET{id}/PUT{id}/DELETE{id}
+- Ride start uses profile to build device chain (or simulator with `simulator_mode=smart|classic`)
+
 ## Database
-- Schema version 2 (auto-migrates from v1)
-- Tables: routes, route_points, rides, ride_samples, user_settings, schema_version
+- Schema version 3 (auto-migrates from v1/v2)
+- Tables: routes, route_points, rides, ride_samples, user_settings, trainer_profiles, schema_version
 - ride_samples has composite PK (ride_id, idx) with CASCADE delete
 - Settings stored as key-value pairs, loaded into `UserSettings` dataclass
 
 ## Phases
 - Phase 1 (complete): Project scaffold + GPX processing + API + DB
 - Phase 2 (complete): BLE trainer integration, ride simulation, device protocols
+- Phase 2.5 (complete): Classic/sensor trainer support, trainer profiles, virtual speed model
 - Phase 3+: Strava sync, real BLE hardware testing, UI

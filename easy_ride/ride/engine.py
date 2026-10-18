@@ -9,7 +9,7 @@ from easy_ride.ble.device_types import HRMData, TrainerData, TrainerDevice, HRMD
 from easy_ride.ble.simulator import SimulatedHRM
 from easy_ride.exceptions import RideStateError
 from easy_ride.models import Ride, RideSample, RideStatus, Route
-from easy_ride.ride.physics import effort_fraction
+from easy_ride.ride.physics import effort_fraction, speed_from_power
 from easy_ride.ride.stats import StatsCollector
 
 
@@ -34,11 +34,13 @@ class RideEngine:
         trainer: TrainerDevice,
         hrm: Optional[HRMDevice] = None,
         ftp: int = 200,
+        rider_mass: float = 75.0,
     ):
         self._route = route
         self._trainer = trainer
         self._hrm = hrm
         self._ftp = ftp
+        self._rider_mass = rider_mass
 
         self._ride_id = str(uuid.uuid4())
         self._status = RideStatus.ACTIVE
@@ -180,16 +182,23 @@ class RideEngine:
     async def _main_loop(self) -> None:
         try:
             total_distance = self._route.stats.total_distance
+            last_time = time.time()
             while True:
                 now = time.time()
+                dt = now - last_time
+                last_time = now
 
                 # Process trainer data
                 td = self._trainer_data
-                speed = td.instant_speed if td else 0.0
                 power = td.instant_power if td else 0
                 cadence = td.instant_cadence if td else 0
-                if td:
-                    self._distance = td.distance
+
+                # Compute virtual speed from power + current gradient
+                gradient_fraction = self._current_gradient() / 100.0
+                virtual_speed = speed_from_power(
+                    float(power), gradient_fraction, self._rider_mass
+                ) if power > 0 else 0.0
+                self._distance += virtual_speed * dt
 
                 # Process HRM data
                 heart_rate = self._hrm_data.bpm if self._hrm_data else 0
@@ -207,11 +216,11 @@ class RideEngine:
                 # Set trainer gradient
                 await self._trainer.set_target_gradient(gradient)
 
-                # Record sample
+                # Record sample with virtual speed
                 sample = RideSample(
                     timestamp=now,
                     distance=self._distance,
-                    speed=speed,
+                    speed=virtual_speed,
                     power=power,
                     cadence=cadence,
                     heart_rate=heart_rate,
@@ -222,7 +231,7 @@ class RideEngine:
                 # Update stats
                 self._stats.record(
                     timestamp=now,
-                    speed=speed,
+                    speed=virtual_speed,
                     power=power,
                     cadence=cadence,
                     heart_rate=heart_rate,
@@ -238,7 +247,7 @@ class RideEngine:
                     "sample": {
                         "timestamp": now,
                         "distance": self._distance,
-                        "speed": speed,
+                        "speed": virtual_speed,
                         "power": power,
                         "cadence": cadence,
                         "heart_rate": heart_rate,

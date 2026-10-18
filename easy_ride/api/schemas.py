@@ -47,6 +47,8 @@ class RouteListResponse(BaseModel):
 class StartRideRequest(BaseModel):
     route_id: str
     use_simulator: bool = True
+    profile_id: str | None = None
+    simulator_mode: str = "smart"  # "smart" or "classic"
 
 
 class RideSampleResponse(BaseModel):
@@ -119,3 +121,37 @@ class SettingsUpdateRequest(BaseModel):
     trainer_device_id: str | None = None
     hrm_device_id: str | None = None
     elevation_smoothing_window: int | None = None
+
+
+# --- Trainer Profile schemas ---
+
+
+class TrainerProfileRequest(BaseModel):
+    name: str
+    trainer_type: str  # "smart", "classic", "power_meter_only"
+    trainer_address: str | None = None
+    speed_sensor_address: str | None = None
+    cadence_sensor_address: str | None = None
+    power_meter_address: str | None = None
+    hrm_address: str | None = None
+    resistance_factor: float = 20.0
+    wheel_circumference: float = 2.105
+    is_default: bool = False
+
+
+class TrainerProfileResponse(BaseModel):
+    id: str
+    name: str
+    trainer_type: str
+    trainer_address: str | None = None
+    speed_sensor_address: str | None = None
+    cadence_sensor_address: str | None = None
+    power_meter_address: str | None = None
+    hrm_address: str | None = None
+    resistance_factor: float
+    wheel_circumference: float
+    is_default: bool
+
+
+class TrainerProfileListResponse(BaseModel):
+    profiles: list[TrainerProfileResponse]

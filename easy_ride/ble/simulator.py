@@ -4,7 +4,12 @@ import asyncio
 import random
 from typing import Callable, Optional
 
-from easy_ride.ble.device_types import HRMData, TrainerData
+from easy_ride.ble.device_types import (
+    HRMData,
+    PowerMeterData,
+    SpeedCadenceData,
+    TrainerData,
+)
 from easy_ride.ride.physics import effort_fraction, speed_from_power
 
 
@@ -180,6 +185,151 @@ class SimulatedHRM:
                 bpm = min(bpm, self._max_hr)
 
                 data = HRMData(bpm=bpm, sensor_contact=True)
+                if self._handler:
+                    self._handler(data)
+                await asyncio.sleep(1.0)
+        except asyncio.CancelledError:
+            raise
+
+
+class SimulatedSpeedCadenceSensor:
+    """Simulated CSC sensor for testing classic trainer setups.
+
+    Generates wheel speed and cadence based on an effort fraction.
+    """
+
+    def __init__(self, wheel_circumference: float = 2.105):
+        self._wheel_circumference = wheel_circumference
+        self._connected = False
+        self._handler: Optional[Callable[[SpeedCadenceData], None]] = None
+        self._task: Optional[asyncio.Task] = None
+        self._effort: float = 0.5
+        self._cumulative_wheel_revs: int = 0
+        self._cumulative_crank_revs: int = 0
+
+    @property
+    def is_connected(self) -> bool:
+        return self._connected
+
+    async def connect(self) -> None:
+        self._connected = True
+
+    async def disconnect(self) -> None:
+        await self.stop_notifications()
+        self._connected = False
+
+    def set_data_handler(self, handler: Callable[[SpeedCadenceData], None]) -> None:
+        self._handler = handler
+
+    def set_effort(self, fraction: float) -> None:
+        """Set effort level (0.0-1.0) to control simulated speed/cadence."""
+        self._effort = max(0.0, min(1.0, fraction))
+
+    async def start_notifications(self) -> None:
+        if self._task is None or self._task.done():
+            self._task = asyncio.create_task(self._generate_loop())
+
+    async def stop_notifications(self) -> None:
+        if self._task is not None and not self._task.done():
+            self._task.cancel()
+            try:
+                await self._task
+            except asyncio.CancelledError:
+                pass
+            self._task = None
+
+    async def _generate_loop(self) -> None:
+        try:
+            while True:
+                # Speed 2-12 m/s based on effort
+                speed = 2.0 + self._effort * 10.0
+                noise = random.gauss(0, speed * 0.03)
+                speed = max(0.5, speed + noise)
+
+                # Cadence 50-100 rpm based on effort
+                cadence = int(50 + self._effort * 50)
+                cadence += random.randint(-2, 2)
+                cadence = max(30, cadence)
+
+                # Accumulate revolutions (1Hz = 1 second of travel)
+                wheel_revs_this_tick = speed / self._wheel_circumference
+                self._cumulative_wheel_revs += int(round(wheel_revs_this_tick))
+                crank_revs_this_tick = cadence / 60.0
+                self._cumulative_crank_revs += int(round(crank_revs_this_tick))
+
+                data = SpeedCadenceData(
+                    wheel_speed=speed,
+                    cadence=cadence,
+                    cumulative_wheel_revs=self._cumulative_wheel_revs,
+                    cumulative_crank_revs=self._cumulative_crank_revs,
+                )
+                if self._handler:
+                    self._handler(data)
+                await asyncio.sleep(1.0)
+        except asyncio.CancelledError:
+            raise
+
+
+class SimulatedPowerMeter:
+    """Simulated power meter for testing classic trainer setups.
+
+    Generates power and cadence based on an effort fraction and FTP.
+    """
+
+    def __init__(self, ftp: int = 200):
+        self._ftp = ftp
+        self._connected = False
+        self._handler: Optional[Callable[[PowerMeterData], None]] = None
+        self._task: Optional[asyncio.Task] = None
+        self._effort: float = 0.5
+
+    @property
+    def is_connected(self) -> bool:
+        return self._connected
+
+    async def connect(self) -> None:
+        self._connected = True
+
+    async def disconnect(self) -> None:
+        await self.stop_notifications()
+        self._connected = False
+
+    def set_data_handler(self, handler: Callable[[PowerMeterData], None]) -> None:
+        self._handler = handler
+
+    def set_effort(self, fraction: float) -> None:
+        """Set effort level (0.0-1.0) to control simulated power."""
+        self._effort = max(0.0, min(1.0, fraction))
+
+    async def start_notifications(self) -> None:
+        if self._task is None or self._task.done():
+            self._task = asyncio.create_task(self._generate_loop())
+
+    async def stop_notifications(self) -> None:
+        if self._task is not None and not self._task.done():
+            self._task.cancel()
+            try:
+                await self._task
+            except asyncio.CancelledError:
+                pass
+            self._task = None
+
+    async def _generate_loop(self) -> None:
+        try:
+            while True:
+                base_power = self._ftp * self._effort
+                noise = random.gauss(0, base_power * 0.05) if base_power > 0 else 0
+                power = max(0, int(base_power + noise))
+
+                # Cadence loosely correlated with effort
+                cadence = int(70 + self._effort * 20)
+                cadence += random.randint(-3, 3)
+                cadence = max(30, cadence)
+
+                data = PowerMeterData(
+                    instant_power=power,
+                    cadence=cadence,
+                )
                 if self._handler:
                     self._handler(data)
                 await asyncio.sleep(1.0)

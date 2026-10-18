@@ -5,7 +5,12 @@ from pathlib import Path
 
 import aiosqlite
 
-from easy_ride.exceptions import DatabaseError, RideNotFoundError, RouteNotFoundError
+from easy_ride.exceptions import (
+    DatabaseError,
+    ProfileNotFoundError,
+    RideNotFoundError,
+    RouteNotFoundError,
+)
 from easy_ride.models import (
     Ride,
     RideSample,
@@ -14,10 +19,12 @@ from easy_ride.models import (
     Route,
     RoutePoint,
     RouteStats,
+    TrainerProfile,
+    TrainerType,
     UserSettings,
 )
 
-SCHEMA_VERSION = 2
+SCHEMA_VERSION = 3
 
 SCHEMA_SQL = """
 CREATE TABLE IF NOT EXISTS schema_version (
@@ -109,6 +116,22 @@ CREATE TABLE IF NOT EXISTS ride_samples (
 );
 """
 
+MIGRATION_V3 = """
+CREATE TABLE IF NOT EXISTS trainer_profiles (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    trainer_type TEXT NOT NULL,
+    trainer_address TEXT,
+    speed_sensor_address TEXT,
+    cadence_sensor_address TEXT,
+    power_meter_address TEXT,
+    hrm_address TEXT,
+    resistance_factor REAL NOT NULL DEFAULT 20.0,
+    wheel_circumference REAL NOT NULL DEFAULT 2.105,
+    is_default INTEGER NOT NULL DEFAULT 0
+);
+"""
+
 
 async def init_db(db: aiosqlite.Connection) -> None:
     await db.executescript(SCHEMA_SQL)
@@ -118,10 +141,14 @@ async def init_db(db: aiosqlite.Connection) -> None:
         await db.execute(
             "INSERT INTO schema_version (version) VALUES (?)", (SCHEMA_VERSION,)
         )
+        await db.executescript(MIGRATION_V3)
     else:
         current = row[0] if isinstance(row[0], int) else row["version"]
         if current < 2:
             await db.executescript(MIGRATION_V2)
+        if current < 3:
+            await db.executescript(MIGRATION_V3)
+        if current < SCHEMA_VERSION:
             await db.execute(
                 "UPDATE schema_version SET version = ?", (SCHEMA_VERSION,)
             )
@@ -435,6 +462,123 @@ async def delete_ride(db: aiosqlite.Connection, ride_id: str) -> None:
     if await cursor.fetchone() is None:
         raise RideNotFoundError(ride_id)
     await db.execute("DELETE FROM rides WHERE id = ?", (ride_id,))
+    await db.commit()
+
+
+# --- Trainer Profile CRUD ---
+
+
+def _row_to_profile(row: aiosqlite.Row) -> TrainerProfile:
+    return TrainerProfile(
+        id=row["id"],
+        name=row["name"],
+        trainer_type=TrainerType(row["trainer_type"]),
+        trainer_address=row["trainer_address"],
+        speed_sensor_address=row["speed_sensor_address"],
+        cadence_sensor_address=row["cadence_sensor_address"],
+        power_meter_address=row["power_meter_address"],
+        hrm_address=row["hrm_address"],
+        resistance_factor=row["resistance_factor"],
+        wheel_circumference=row["wheel_circumference"],
+        is_default=bool(row["is_default"]),
+    )
+
+
+async def insert_profile(db: aiosqlite.Connection, profile: TrainerProfile) -> None:
+    await db.execute(
+        """INSERT INTO trainer_profiles
+           (id, name, trainer_type, trainer_address, speed_sensor_address,
+            cadence_sensor_address, power_meter_address, hrm_address,
+            resistance_factor, wheel_circumference, is_default)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+        (
+            profile.id, profile.name, profile.trainer_type.value,
+            profile.trainer_address, profile.speed_sensor_address,
+            profile.cadence_sensor_address, profile.power_meter_address,
+            profile.hrm_address, profile.resistance_factor,
+            profile.wheel_circumference, int(profile.is_default),
+        ),
+    )
+    await db.commit()
+
+
+async def fetch_profile(db: aiosqlite.Connection, profile_id: str) -> TrainerProfile:
+    cursor = await db.execute(
+        "SELECT * FROM trainer_profiles WHERE id = ?", (profile_id,)
+    )
+    row = await cursor.fetchone()
+    if row is None:
+        raise ProfileNotFoundError(profile_id)
+    return _row_to_profile(row)
+
+
+async def list_profiles(db: aiosqlite.Connection) -> list[TrainerProfile]:
+    cursor = await db.execute("SELECT * FROM trainer_profiles ORDER BY name")
+    rows = await cursor.fetchall()
+    return [_row_to_profile(r) for r in rows]
+
+
+async def update_profile(
+    db: aiosqlite.Connection, profile: TrainerProfile
+) -> None:
+    cursor = await db.execute(
+        "SELECT id FROM trainer_profiles WHERE id = ?", (profile.id,)
+    )
+    if await cursor.fetchone() is None:
+        raise ProfileNotFoundError(profile.id)
+    await db.execute(
+        """UPDATE trainer_profiles SET
+           name = ?, trainer_type = ?, trainer_address = ?,
+           speed_sensor_address = ?, cadence_sensor_address = ?,
+           power_meter_address = ?, hrm_address = ?,
+           resistance_factor = ?, wheel_circumference = ?, is_default = ?
+           WHERE id = ?""",
+        (
+            profile.name, profile.trainer_type.value, profile.trainer_address,
+            profile.speed_sensor_address, profile.cadence_sensor_address,
+            profile.power_meter_address, profile.hrm_address,
+            profile.resistance_factor, profile.wheel_circumference,
+            int(profile.is_default), profile.id,
+        ),
+    )
+    await db.commit()
+
+
+async def delete_profile(db: aiosqlite.Connection, profile_id: str) -> None:
+    cursor = await db.execute(
+        "SELECT id FROM trainer_profiles WHERE id = ?", (profile_id,)
+    )
+    if await cursor.fetchone() is None:
+        raise ProfileNotFoundError(profile_id)
+    await db.execute("DELETE FROM trainer_profiles WHERE id = ?", (profile_id,))
+    await db.commit()
+
+
+async def get_default_profile(
+    db: aiosqlite.Connection,
+) -> TrainerProfile | None:
+    cursor = await db.execute(
+        "SELECT * FROM trainer_profiles WHERE is_default = 1 LIMIT 1"
+    )
+    row = await cursor.fetchone()
+    if row is None:
+        return None
+    return _row_to_profile(row)
+
+
+async def set_default_profile(
+    db: aiosqlite.Connection, profile_id: str
+) -> None:
+    cursor = await db.execute(
+        "SELECT id FROM trainer_profiles WHERE id = ?", (profile_id,)
+    )
+    if await cursor.fetchone() is None:
+        raise ProfileNotFoundError(profile_id)
+    # Clear all defaults, then set the new one
+    await db.execute("UPDATE trainer_profiles SET is_default = 0")
+    await db.execute(
+        "UPDATE trainer_profiles SET is_default = 1 WHERE id = ?", (profile_id,)
+    )
     await db.commit()
 
 

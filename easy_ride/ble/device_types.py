@@ -8,6 +8,8 @@ from typing import Callable, Protocol, runtime_checkable
 class DeviceType(Enum):
     TRAINER = "trainer"
     HRM = "hrm"
+    POWER_METER = "power_meter"
+    SPEED_CADENCE = "speed_cadence"
     UNKNOWN = "unknown"
 
 
@@ -44,6 +46,44 @@ class TrainerDevice(Protocol):
     async def set_target_gradient(self, percent: float) -> None: ...
     async def set_target_power(self, watts: int) -> None: ...
     async def set_target_resistance(self, level: float) -> None: ...
+
+    @property
+    def is_connected(self) -> bool: ...
+
+
+@dataclass
+class SpeedCadenceData:
+    wheel_speed: float  # m/s
+    cadence: int  # rpm
+    cumulative_wheel_revs: int
+    cumulative_crank_revs: int
+
+
+@dataclass
+class PowerMeterData:
+    instant_power: int  # watts
+    cadence: int  # rpm
+
+
+@runtime_checkable
+class SpeedCadenceSensor(Protocol):
+    async def connect(self) -> None: ...
+    async def disconnect(self) -> None: ...
+    def set_data_handler(self, handler: Callable[[SpeedCadenceData], None]) -> None: ...
+    async def start_notifications(self) -> None: ...
+    async def stop_notifications(self) -> None: ...
+
+    @property
+    def is_connected(self) -> bool: ...
+
+
+@runtime_checkable
+class PowerMeterDevice(Protocol):
+    async def connect(self) -> None: ...
+    async def disconnect(self) -> None: ...
+    def set_data_handler(self, handler: Callable[[PowerMeterData], None]) -> None: ...
+    async def start_notifications(self) -> None: ...
+    async def stop_notifications(self) -> None: ...
 
     @property
     def is_connected(self) -> bool: ...

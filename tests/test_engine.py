@@ -127,6 +127,39 @@ class TestRideEngine:
         hr_samples = [s for s in ride.samples if s.heart_rate > 0]
         assert len(hr_samples) >= 1
 
+    async def test_virtual_speed_drops_on_climb(self, sample_route):
+        """Virtual speed should be lower on a steep gradient for similar power."""
+        from easy_ride.ride.physics import speed_from_power
+
+        # Flat: speed at 150W, 0% gradient
+        flat_speed = speed_from_power(150.0, 0.0, 75.0)
+        # Climb: speed at 150W, 8% gradient
+        climb_speed = speed_from_power(150.0, 0.08, 75.0)
+        assert climb_speed < flat_speed * 0.5  # Significantly slower uphill
+
+    async def test_distance_from_virtual_speed(self, sample_route):
+        """Distance should accumulate from virtual speed, not trainer distance."""
+        trainer = SimulatedTrainer(ftp=200, weight=75.0)
+        await trainer.connect()
+        engine = RideEngine(
+            route=sample_route, trainer=trainer, ftp=200, rider_mass=75.0,
+        )
+        await engine.start()
+        await asyncio.sleep(2.5)
+        ride = await engine.stop()
+        # Should have accumulated distance from virtual speed
+        assert ride.samples[-1].distance > 0
+        # Speed in samples should be virtual speed (positive for non-zero power)
+        assert ride.samples[-1].speed > 0
+
+    async def test_rider_mass_affects_speed(self, sample_route):
+        """Heavier rider should be slower for same power."""
+        from easy_ride.ride.physics import speed_from_power
+
+        light_speed = speed_from_power(150.0, 0.05, 60.0)
+        heavy_speed = speed_from_power(150.0, 0.05, 90.0)
+        assert light_speed > heavy_speed
+
     async def test_unsubscribe(self, sample_route):
         trainer = SimulatedTrainer(ftp=200, weight=75.0)
         await trainer.connect()

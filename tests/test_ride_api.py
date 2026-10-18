@@ -202,3 +202,31 @@ class TestRideAPI:
     async def test_pause_nonexistent_404(self, client):
         resp = await client.patch("/api/rides/nonexistent/pause")
         assert resp.status_code == 404
+
+    async def test_start_ride_classic_simulator(self, client):
+        route_id = await _upload_route(client)
+        resp = await client.post(
+            "/api/rides",
+            json={
+                "route_id": route_id,
+                "use_simulator": True,
+                "simulator_mode": "classic",
+            },
+        )
+        assert resp.status_code == 201
+        data = resp.json()
+        assert data["status"] == "active"
+        ride_id = data["id"]
+        await asyncio.sleep(2.5)
+        resp = await client.patch(f"/api/rides/{ride_id}/stop")
+        assert resp.status_code == 200
+        stop_data = resp.json()
+        assert stop_data["status"] == "completed"
+
+    async def test_start_ride_no_profile_no_simulator_400(self, client):
+        route_id = await _upload_route(client)
+        resp = await client.post(
+            "/api/rides",
+            json={"route_id": route_id, "use_simulator": False},
+        )
+        assert resp.status_code == 400

@@ -40,11 +40,13 @@ def create_app(config: Config | None = None) -> FastAPI:
     from easy_ride.api.ride_routes import router as ride_router
     from easy_ride.api.device_routes import router as device_router
     from easy_ride.api.settings_routes import router as settings_router
+    from easy_ride.api.profile_routes import router as profile_router
 
     app.include_router(router)
     app.include_router(ride_router)
     app.include_router(device_router)
     app.include_router(settings_router)
+    app.include_router(profile_router)
 
     return app
 

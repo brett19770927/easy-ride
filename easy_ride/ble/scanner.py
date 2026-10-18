@@ -8,12 +8,20 @@ FTMS_UUID = "00001826-0000-1000-8000-00805f9b34fb"
 HRS_UUID = "0000180d-0000-1000-8000-00805f9b34fb"
 # Cycling Power Service UUID
 CPS_UUID = "00001818-0000-1000-8000-00805f9b34fb"
+# Cycling Speed and Cadence Service UUID
+CSC_UUID = "00001816-0000-1000-8000-00805f9b34fb"
 
 
 def _classify_device(service_uuids: list[str]) -> DeviceType:
     uuids_lower = [u.lower() for u in service_uuids]
-    if FTMS_UUID in uuids_lower or CPS_UUID in uuids_lower:
+    if FTMS_UUID in uuids_lower:
         return DeviceType.TRAINER
+    # CPS without FTMS → standalone power meter
+    if CPS_UUID in uuids_lower:
+        return DeviceType.POWER_METER
+    # CSC only if no CPS (some power meters advertise both)
+    if CSC_UUID in uuids_lower:
+        return DeviceType.SPEED_CADENCE
     if HRS_UUID in uuids_lower:
         return DeviceType.HRM
     return DeviceType.UNKNOWN

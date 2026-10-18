@@ -82,6 +82,27 @@ class Ride:
     samples: list[RideSample] = field(default_factory=list)
 
 
+class TrainerType(Enum):
+    SMART = "smart"
+    CLASSIC = "classic"
+    POWER_METER_ONLY = "power_meter_only"
+
+
+@dataclass
+class TrainerProfile:
+    id: str
+    name: str
+    trainer_type: TrainerType
+    trainer_address: Optional[str] = None
+    speed_sensor_address: Optional[str] = None
+    cadence_sensor_address: Optional[str] = None
+    power_meter_address: Optional[str] = None
+    hrm_address: Optional[str] = None
+    resistance_factor: float = 20.0
+    wheel_circumference: float = 2.105
+    is_default: bool = False
+
+
 @dataclass
 class UserSettings:
     ftp: int = 200

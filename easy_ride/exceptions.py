@@ -61,6 +61,12 @@ class RideNotFoundError(EasyRideError):
         super().__init__(f"Ride not found: {ride_id}")
 
 
+class ProfileNotFoundError(EasyRideError):
+    def __init__(self, profile_id: str):
+        self.profile_id = profile_id
+        super().__init__(f"Trainer profile not found: {profile_id}")
+
+
 class RideStateError(EasyRideError):
     def __init__(self, ride_id: str, current: str, attempted: str):
         self.ride_id = ride_id

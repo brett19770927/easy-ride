@@ -16,17 +16,30 @@ from easy_ride.api.schemas import (
     RideStatsResponse,
     StartRideRequest,
 )
-from easy_ride.ble.simulator import SimulatedHRM, SimulatedTrainer
+from easy_ride.ble.classic_adapter import ClassicTrainerAdapter
+from easy_ride.ble.simulator import (
+    SimulatedHRM,
+    SimulatedPowerMeter,
+    SimulatedSpeedCadenceSensor,
+    SimulatedTrainer,
+)
 from easy_ride.db import (
     delete_ride,
+    fetch_profile,
     fetch_ride,
     fetch_route,
+    get_default_profile,
     get_settings,
     insert_ride,
     list_rides,
     update_ride_status,
 )
-from easy_ride.exceptions import RideNotFoundError, RideStateError, RouteNotFoundError
+from easy_ride.exceptions import (
+    ProfileNotFoundError,
+    RideNotFoundError,
+    RideStateError,
+    RouteNotFoundError,
+)
 from easy_ride.models import RideStatus
 from easy_ride.ride.engine import RideEngine
 
@@ -86,6 +99,26 @@ def _ride_to_detail(ride) -> RideDetailResponse:
     )
 
 
+def _build_simulator_devices(settings, mode: str = "smart"):
+    """Build simulated devices based on mode."""
+    if mode == "classic":
+        speed_sensor = SimulatedSpeedCadenceSensor()
+        pm = SimulatedPowerMeter(ftp=settings.ftp)
+        trainer = ClassicTrainerAdapter(speed_sensor=speed_sensor, power_meter=pm)
+    else:
+        trainer = SimulatedTrainer(ftp=settings.ftp, weight=settings.weight)
+    hrm = SimulatedHRM()
+    return trainer, hrm
+
+
+async def _build_devices_from_profile(profile, settings):
+    """Build devices from a trainer profile. Currently BLE not implemented."""
+    raise HTTPException(
+        status_code=501,
+        detail="Real BLE device support not yet implemented — use use_simulator=true",
+    )
+
+
 @router.post("/rides", status_code=201, response_model=RideMetadataResponse)
 async def start_ride(request: Request, body: StartRideRequest):
     db = request.app.state.db
@@ -97,17 +130,33 @@ async def start_ride(request: Request, body: StartRideRequest):
     settings = await get_settings(db)
 
     if body.use_simulator:
-        trainer = SimulatedTrainer(ftp=settings.ftp, weight=settings.weight)
-        hrm = SimulatedHRM()
+        trainer, hrm = _build_simulator_devices(settings, body.simulator_mode)
         await trainer.connect()
         await hrm.connect()
     else:
-        raise HTTPException(
-            status_code=501,
-            detail="Real BLE device support not yet implemented — use use_simulator=true",
-        )
+        # Look up profile
+        profile = None
+        if body.profile_id:
+            try:
+                profile = await fetch_profile(db, body.profile_id)
+            except ProfileNotFoundError:
+                raise HTTPException(
+                    status_code=404, detail=f"Profile not found: {body.profile_id}"
+                )
+        else:
+            profile = await get_default_profile(db)
+            if profile is None:
+                raise HTTPException(
+                    status_code=400,
+                    detail="No profile specified and no default profile set — "
+                    "use use_simulator=true or create a trainer profile",
+                )
+        trainer, hrm = await _build_devices_from_profile(profile, settings)
 
-    engine = RideEngine(route=route, trainer=trainer, hrm=hrm, ftp=settings.ftp)
+    engine = RideEngine(
+        route=route, trainer=trainer, hrm=hrm,
+        ftp=settings.ftp, rider_mass=settings.weight,
+    )
     ride = await engine.start()
 
     # Persist initial ride record
