@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+{% set active_page = "routes" %}
+
+{% block title %}Routes — Easy Ride{% endblock %}
+{% block heading %}Routes{% endblock %}
+
+{% block content %}
+<section aria-labelledby="upload-heading">
+    <h2 id="upload-heading">Upload GPX File</h2>
+    <form action="/routes/upload" method="post" enctype="multipart/form-data">
+        <label for="gpx-file">GPX file</label>
+        <input type="file" id="gpx-file" name="file" accept=".gpx" required>
+
+        <label for="route-name">Route name (optional)</label>
+        <input type="text" id="route-name" name="name" placeholder="Leave blank to use GPX metadata">
+
+        <button type="submit">Upload</button>
+    </form>
+</section>
+
+{% if error %}
+<div class="status-message status-message--error" role="alert">{{ error }}</div>
+{% endif %}
+
+<section aria-labelledby="route-list-heading">
+    <h2 id="route-list-heading">Your Routes</h2>
+    {% if routes %}
+    <ul class="item-list">
+        {% for route in routes %}
+        <li>
+            <a href="/routes/{{ route.id }}">{{ route.name }}</a>
+            — {{ "%.1f"|format(route.stats.total_distance / 1000) }} km,
+            {{ "%.0f"|format(route.stats.total_ascent) }} m ascent,
+            {{ route.stats.point_count }} points
+        </li>
+        {% endfor %}
+    </ul>
+    {% else %}
+    <p>No routes uploaded yet.</p>
+    {% endif %}
+</section>
+{% endblock %}

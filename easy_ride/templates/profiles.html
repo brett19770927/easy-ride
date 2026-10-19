@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% set active_page = "profiles" %}
+
+{% block title %}Trainer Profiles — Easy Ride{% endblock %}
+{% block heading %}Trainer Profiles{% endblock %}
+
+{% block content %}
+{% if profiles %}
+<ul class="item-list">
+    {% for profile in profiles %}
+    <li>
+        <a href="/profiles/{{ profile.id }}/edit">{{ profile.name }}</a>
+        — {{ profile.trainer_type }}
+        {% if profile.is_default %} (default){% endif %}
+    </li>
+    {% endfor %}
+</ul>
+{% else %}
+<p>No trainer profiles yet.</p>
+{% endif %}
+
+<a href="/profiles/new" class="button">Create New Profile</a>
+{% endblock %}

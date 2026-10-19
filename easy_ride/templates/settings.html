@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+{% set active_page = "settings" %}
+
+{% block title %}Settings — Easy Ride{% endblock %}
+{% block heading %}Settings{% endblock %}
+
+{% block content %}
+{% if success %}
+<div class="status-message status-message--success" role="status">Settings saved.</div>
+{% endif %}
+
+<form action="/settings" method="post">
+    <label for="ftp">FTP (watts)</label>
+    <input type="number" id="ftp" name="ftp" value="{{ settings.ftp }}" min="50" max="500" required>
+
+    <label for="weight">Weight (kg)</label>
+    <input type="number" id="weight" name="weight" value="{{ settings.weight }}" min="30" max="200" step="0.1" required>
+
+    <label for="elevation_smoothing_window">Elevation smoothing window</label>
+    <input type="number" id="elevation_smoothing_window" name="elevation_smoothing_window"
+           value="{{ settings.elevation_smoothing_window }}" min="1" max="20" required>
+
+    <button type="submit">Save Settings</button>
+</form>
+
+<section aria-labelledby="strava-heading">
+    <h2 id="strava-heading">Strava</h2>
+    {% if strava_connected %}
+    <p>Connected to Strava.
+        {% if strava_expired %}
+        <strong>(Token expired — will auto-refresh on next use)</strong>
+        {% endif %}
+    </p>
+    <form action="/api/strava/disconnect" method="post">
+        <button type="submit" class="button-secondary">Disconnect Strava</button>
+    </form>
+    {% else %}
+    <p>Not connected to Strava.</p>
+    {% if strava_configured %}
+    <a href="{{ strava_connect_url }}" class="button">Connect to Strava</a>
+    {% else %}
+    <p class="help-text">Set STRAVA_CLIENT_ID and STRAVA_CLIENT_SECRET environment variables to enable Strava integration.</p>
+    {% endif %}
+    {% endif %}
+</section>
+{% endblock %}

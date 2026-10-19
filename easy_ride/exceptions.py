@@ -89,6 +89,11 @@ class StravaNotConfiguredError(StravaError):
         )
 
 
+class ProfileValidationError(EasyRideError):
+    def __init__(self, message: str):
+        super().__init__(message)
+
+
 class RideStateError(EasyRideError):
     def __init__(self, ride_id: str, current: str, attempted: str):
         self.ride_id = ride_id

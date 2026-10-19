@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+{% set active_page = "rides" %}
+
+{% block title %}Active Ride — Easy Ride{% endblock %}
+{% block heading %}Active Ride{% endblock %}
+
+{% block content %}
+<div id="ride-data" data-ride-id="{{ ride.id }}">
+    <p id="ride-status">Status: <strong>{{ ride.status }}</strong></p>
+
+    <section class="live-data" aria-labelledby="live-data-heading">
+        <h2 id="live-data-heading">Live Data</h2>
+        <dl aria-live="polite">
+            <dt>Power</dt>
+            <dd id="live-power">{{ ride.samples[-1].power if ride.samples else 0 }} W</dd>
+
+            <dt>Speed</dt>
+            <dd id="live-speed">{{ "%.1f"|format(ride.samples[-1].speed * 3.6 if ride.samples else 0) }} km/h</dd>
+
+            <dt>Cadence</dt>
+            <dd id="live-cadence">{{ ride.samples[-1].cadence if ride.samples else 0 }} rpm</dd>
+
+            <dt>Heart Rate</dt>
+            <dd id="live-heart-rate">{{ ride.samples[-1].heart_rate if ride.samples else 0 }} bpm</dd>
+
+            <dt>Distance</dt>
+            <dd id="live-distance">{{ "%.2f"|format(ride.samples[-1].distance / 1000 if ride.samples else 0) }} km</dd>
+
+            <dt>Duration</dt>
+            <dd id="live-duration">0:00</dd>
+
+            <dt>Avg Power</dt>
+            <dd id="live-avg-power">{{ ride.stats.avg_power if ride.stats else 0 }} W</dd>
+
+            <dt>Avg Speed</dt>
+            <dd id="live-avg-speed">{{ "%.1f"|format(ride.stats.avg_speed * 3.6 if ride.stats else 0) }} km/h</dd>
+        </dl>
+    </section>
+
+    <div class="ride-controls">
+        <button type="button" data-ride-action="pause" id="btn-pause">Pause</button>
+        <button type="button" data-ride-action="resume" id="btn-resume" hidden>Resume</button>
+        <button type="button" data-ride-action="stop" id="btn-stop">Stop</button>
+    </div>
+
+    <div id="live-announcer" class="sr-only" aria-live="polite" aria-atomic="true"></div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="/static/js/ride-live.js"></script>
+{% endblock %}

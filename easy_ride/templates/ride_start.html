@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+{% set active_page = "rides" %}
+
+{% block title %}Start Ride — Easy Ride{% endblock %}
+{% block heading %}Start Ride{% endblock %}
+
+{% block content %}
+{% if route %}
+<p>Route: <strong>{{ route.name }}</strong>
+    ({{ "%.1f"|format(route.stats.total_distance / 1000) }} km,
+    {{ "%.0f"|format(route.stats.total_ascent) }} m ascent)</p>
+{% endif %}
+
+{% if error %}
+<div class="status-message status-message--error" role="alert">{{ error }}</div>
+{% endif %}
+
+<form action="/ride/start" method="post">
+    <input type="hidden" name="route_id" value="{{ route_id }}">
+
+    <fieldset>
+        <legend>Ride Mode</legend>
+        <div class="radio-group">
+            <label>
+                <input type="radio" name="mode" value="simulator_smart" checked>
+                Simulator (smart trainer)
+            </label>
+            <label>
+                <input type="radio" name="mode" value="simulator_classic">
+                Simulator (classic trainer)
+            </label>
+            {% for profile in profiles %}
+            <label>
+                <input type="radio" name="mode" value="profile_{{ profile.id }}">
+                {{ profile.name }} ({{ profile.trainer_type }})
+            </label>
+            {% endfor %}
+        </div>
+    </fieldset>
+
+    <button type="submit">Start Ride</button>
+</form>
+{% endblock %}

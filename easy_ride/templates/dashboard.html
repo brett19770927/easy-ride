@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+{% set active_page = "dashboard" %}
+
+{% block title %}Dashboard — Easy Ride{% endblock %}
+{% block heading %}Dashboard{% endblock %}
+
+{% block content %}
+<section aria-labelledby="recent-routes-heading">
+    <h2 id="recent-routes-heading">Recent Routes</h2>
+    {% if routes %}
+    <ul class="item-list">
+        {% for route in routes %}
+        <li>
+            <a href="/routes/{{ route.id }}">{{ route.name }}</a>
+            — {{ "%.1f"|format(route.stats.total_distance / 1000) }} km,
+            {{ route.stats.point_count }} points
+        </li>
+        {% endfor %}
+    </ul>
+    {% else %}
+    <p>No routes yet. <a href="/routes">Upload a GPX file</a> to get started.</p>
+    {% endif %}
+</section>
+
+<section aria-labelledby="recent-rides-heading">
+    <h2 id="recent-rides-heading">Recent Rides</h2>
+    {% if rides %}
+    <ul class="item-list">
+        {% for ride in rides %}
+        <li>
+            <a href="/ride/{{ ride.id }}">Ride {{ ride.started_at[:10] }}</a>
+            — {{ ride.status }}
+            {% if ride.stats %}
+            , {{ "%.1f"|format(ride.stats.distance / 1000) }} km
+            {% endif %}
+        </li>
+        {% endfor %}
+    </ul>
+    {% else %}
+    <p>No rides yet.</p>
+    {% endif %}
+</section>
+
+<section aria-labelledby="quick-actions-heading">
+    <h2 id="quick-actions-heading">Quick Actions</h2>
+    <ul>
+        <li><a href="/routes">Upload a route</a></li>
+        <li><a href="/profiles">Manage trainer profiles</a></li>
+        <li><a href="/devices">Scan for BLE devices</a></li>
+        <li><a href="/settings">Settings</a></li>
+    </ul>
+</section>
+{% endblock %}

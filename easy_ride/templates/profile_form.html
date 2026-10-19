@@ -1,0 +1,81 @@
+{% extends "base.html" %}
+{% set active_page = "profiles" %}
+
+{% block title %}{{ "Edit" if profile else "Create" }} Profile — Easy Ride{% endblock %}
+{% block heading %}{{ "Edit" if profile else "Create" }} Profile{% endblock %}
+
+{% block content %}
+{% if error %}
+<div class="status-message status-message--error" role="alert">{{ error }}</div>
+{% endif %}
+
+<form action="{{ '/profiles/' + profile.id + '/edit' if profile else '/profiles/new' }}" method="post">
+    <fieldset>
+        <legend>Basic Info</legend>
+
+        <label for="name">Profile name</label>
+        <input type="text" id="name" name="name" value="{{ profile.name if profile else '' }}" required>
+
+        <label for="trainer_type">Trainer type</label>
+        <select id="trainer_type" name="trainer_type" required>
+            <option value="smart" {{ 'selected' if profile and profile.trainer_type == 'smart' }}>Smart (FTMS)</option>
+            <option value="classic" {{ 'selected' if profile and profile.trainer_type == 'classic' }}>Classic (speed/cadence sensor)</option>
+            <option value="power_meter_only" {{ 'selected' if profile and profile.trainer_type == 'power_meter_only' }}>Power meter only</option>
+        </select>
+
+        <label for="is_default">
+            <input type="checkbox" id="is_default" name="is_default" value="true"
+                   {{ 'checked' if profile and profile.is_default }} style="width: auto; display: inline;">
+            Set as default profile
+        </label>
+    </fieldset>
+
+    <fieldset>
+        <legend>Device Addresses</legend>
+        <p class="help-text" id="address-help">BLE MAC addresses (e.g. AA:BB:CC:DD:EE:FF). Use the <a href="/devices">device scanner</a> to discover addresses.</p>
+
+        <label for="trainer_address">Trainer address (for smart trainers)</label>
+        <input type="text" id="trainer_address" name="trainer_address"
+               value="{{ profile.trainer_address if profile and profile.trainer_address else '' }}"
+               aria-describedby="address-help">
+
+        <label for="speed_sensor_address">Speed/cadence sensor address</label>
+        <input type="text" id="speed_sensor_address" name="speed_sensor_address"
+               value="{{ profile.speed_sensor_address if profile and profile.speed_sensor_address else '' }}"
+               aria-describedby="address-help">
+
+        <label for="power_meter_address">Power meter address</label>
+        <input type="text" id="power_meter_address" name="power_meter_address"
+               value="{{ profile.power_meter_address if profile and profile.power_meter_address else '' }}"
+               aria-describedby="address-help">
+
+        <label for="hrm_address">Heart rate monitor address</label>
+        <input type="text" id="hrm_address" name="hrm_address"
+               value="{{ profile.hrm_address if profile and profile.hrm_address else '' }}"
+               aria-describedby="address-help">
+    </fieldset>
+
+    <fieldset>
+        <legend>Calibration</legend>
+
+        <label for="resistance_factor">Resistance factor</label>
+        <input type="number" id="resistance_factor" name="resistance_factor"
+               value="{{ profile.resistance_factor if profile else 20.0 }}" step="0.1" min="1" max="100">
+        <p class="help-text">Power estimate multiplier for classic trainers without a power meter.</p>
+
+        <label for="wheel_circumference">Wheel circumference (m)</label>
+        <input type="number" id="wheel_circumference" name="wheel_circumference"
+               value="{{ profile.wheel_circumference if profile else 2.105 }}" step="0.001" min="1.0" max="3.0">
+        <p class="help-text">700x25c = 2.105m, 700x23c = 2.098m, 700x28c = 2.136m</p>
+    </fieldset>
+
+    <button type="submit">{{ "Save Changes" if profile else "Create Profile" }}</button>
+</form>
+
+{% if profile %}
+<form action="/profiles/{{ profile.id }}/delete" method="post" style="margin-top: 2rem;">
+    <button type="submit" class="button-danger"
+            onclick="return confirm('Delete this profile?')">Delete Profile</button>
+</form>
+{% endif %}
+{% endblock %}

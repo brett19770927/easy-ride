@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+{% set active_page = "routes" %}
+
+{% block title %}{{ route.name }} — Easy Ride{% endblock %}
+{% block heading %}{{ route.name }}{% endblock %}
+
+{% block content %}
+<dl>
+    <dt>Distance</dt>
+    <dd>{{ "%.1f"|format(route.stats.total_distance / 1000) }} km</dd>
+
+    <dt>Total ascent</dt>
+    <dd>{{ "%.0f"|format(route.stats.total_ascent) }} m</dd>
+
+    <dt>Total descent</dt>
+    <dd>{{ "%.0f"|format(route.stats.total_descent) }} m</dd>
+
+    <dt>Elevation range</dt>
+    <dd>{{ "%.0f"|format(route.stats.min_elevation) }} – {{ "%.0f"|format(route.stats.max_elevation) }} m</dd>
+
+    <dt>Gradient range</dt>
+    <dd>{{ "%.1f"|format(route.stats.min_gradient) }}% to {{ "%.1f"|format(route.stats.max_gradient) }}%</dd>
+
+    <dt>Points</dt>
+    <dd>{{ route.stats.point_count }}</dd>
+
+    <dt>Source file</dt>
+    <dd>{{ route.source_filename }}</dd>
+
+    <dt>Uploaded</dt>
+    <dd>{{ route.created_at }}</dd>
+</dl>
+
+<a href="/ride/start?route_id={{ route.id }}" class="button">Start Ride</a>
+
+<form action="/routes/{{ route.id }}/delete" method="post" style="margin-top: 2rem;">
+    <button type="submit" class="button-danger"
+            onclick="return confirm('Delete this route?')">Delete Route</button>
+</form>
+{% endblock %}

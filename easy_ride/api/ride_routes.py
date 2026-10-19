@@ -34,8 +34,11 @@ from easy_ride.db import (
     list_rides,
     update_ride_status,
 )
+from easy_ride.ble.factory import build_devices_from_profile as _factory_build
 from easy_ride.exceptions import (
+    DeviceConnectionError,
     ProfileNotFoundError,
+    ProfileValidationError,
     RideNotFoundError,
     RideStateError,
     RouteNotFoundError,
@@ -114,11 +117,30 @@ def _build_simulator_devices(settings, mode: str = "smart"):
 
 
 async def _build_devices_from_profile(profile, settings):
-    """Build devices from a trainer profile. Currently BLE not implemented."""
-    raise HTTPException(
-        status_code=501,
-        detail="Real BLE device support not yet implemented — use use_simulator=true",
-    )
+    """Build real BLE devices from a trainer profile and connect them."""
+    try:
+        trainer, hrm = _factory_build(profile)
+    except ProfileValidationError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+    try:
+        await trainer.connect()
+    except (DeviceConnectionError, Exception) as e:
+        raise HTTPException(
+            status_code=503, detail=f"Trainer connection failed: {e}"
+        )
+
+    if hrm is not None:
+        try:
+            await hrm.connect()
+        except (DeviceConnectionError, Exception):
+            # Clean up already-connected trainer
+            await trainer.disconnect()
+            raise HTTPException(
+                status_code=503, detail="HRM connection failed"
+            )
+
+    return trainer, hrm
 
 
 @router.post("/rides", status_code=201, response_model=RideMetadataResponse)

@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+{% set active_page = "rides" %}
+
+{% block title %}Ride Details — Easy Ride{% endblock %}
+{% block heading %}Ride Details{% endblock %}
+
+{% block content %}
+<dl>
+    <dt>Status</dt>
+    <dd>{{ ride.status }}</dd>
+
+    <dt>Started</dt>
+    <dd>{{ ride.started_at }}</dd>
+
+    {% if ride.finished_at %}
+    <dt>Finished</dt>
+    <dd>{{ ride.finished_at }}</dd>
+    {% endif %}
+
+    {% if ride.stats %}
+    <dt>Duration</dt>
+    <dd>{{ "%.0f"|format(ride.stats.duration) }} s</dd>
+
+    <dt>Distance</dt>
+    <dd>{{ "%.1f"|format(ride.stats.distance / 1000) }} km</dd>
+
+    <dt>Avg Speed</dt>
+    <dd>{{ "%.1f"|format(ride.stats.avg_speed * 3.6) }} km/h</dd>
+
+    <dt>Max Speed</dt>
+    <dd>{{ "%.1f"|format(ride.stats.max_speed * 3.6) }} km/h</dd>
+
+    <dt>Avg Power</dt>
+    <dd>{{ ride.stats.avg_power }} W</dd>
+
+    <dt>Max Power</dt>
+    <dd>{{ ride.stats.max_power }} W</dd>
+
+    <dt>Avg Cadence</dt>
+    <dd>{{ ride.stats.avg_cadence }} rpm</dd>
+
+    <dt>Avg Heart Rate</dt>
+    <dd>{{ ride.stats.avg_heart_rate }} bpm</dd>
+
+    <dt>Total Ascent</dt>
+    <dd>{{ "%.0f"|format(ride.stats.total_ascent) }} m</dd>
+    {% endif %}
+</dl>
+
+{% if ride.status == "completed" %}
+<section aria-labelledby="strava-heading">
+    <h2 id="strava-heading">Strava</h2>
+    {% if ride.strava_activity_id %}
+    <p>Uploaded to Strava (activity {{ ride.strava_activity_id }})</p>
+    {% else %}
+    <form action="/api/strava/upload/{{ ride.id }}" method="post">
+        <button type="submit">Upload to Strava</button>
+    </form>
+    {% endif %}
+</section>
+{% endif %}
+
+<form action="/ride/{{ ride.id }}/delete" method="post" style="margin-top: 2rem;">
+    <button type="submit" class="button-danger"
+            onclick="return confirm('Delete this ride?')">Delete Ride</button>
+</form>
+{% endblock %}

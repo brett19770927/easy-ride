@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Easy Ride{% endblock %}</title>
+    <link rel="stylesheet" href="/static/css/main.css">
+</head>
+<body>
+    <a href="#main-content" class="skip-link">Skip to main content</a>
+
+    <header role="banner">
+        <nav aria-label="Main navigation">
+            <ul>
+                <li><a href="/"{% if active_page == "dashboard" %} aria-current="page"{% endif %}>Dashboard</a></li>
+                <li><a href="/routes"{% if active_page == "routes" %} aria-current="page"{% endif %}>Routes</a></li>
+                <li><a href="/rides"{% if active_page == "rides" %} aria-current="page"{% endif %}>Rides</a></li>
+                <li><a href="/profiles"{% if active_page == "profiles" %} aria-current="page"{% endif %}>Profiles</a></li>
+                <li><a href="/devices"{% if active_page == "devices" %} aria-current="page"{% endif %}>Devices</a></li>
+                <li><a href="/settings"{% if active_page == "settings" %} aria-current="page"{% endif %}>Settings</a></li>
+            </ul>
+        </nav>
+    </header>
+
+    <main id="main-content" role="main">
+        <h1>{% block heading %}Easy Ride{% endblock %}</h1>
+        {% block content %}{% endblock %}
+    </main>
+
+    <footer role="contentinfo">
+        <p>Easy Ride &mdash; Virtual Cycling</p>
+    </footer>
+
+    {% block scripts %}{% endblock %}
+</body>
+</html>

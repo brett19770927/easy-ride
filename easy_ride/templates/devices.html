@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+{% set active_page = "devices" %}
+
+{% block title %}BLE Devices — Easy Ride{% endblock %}
+{% block heading %}BLE Devices{% endblock %}
+
+{% block content %}
+<form action="/devices/scan" method="post">
+    <button type="submit">Scan for Devices</button>
+</form>
+
+<section aria-labelledby="scan-results-heading">
+    <h2 id="scan-results-heading">Scan Results</h2>
+    <div aria-live="polite">
+        {% if scanned %}
+            {% if devices %}
+            <ul class="item-list">
+                {% for device in devices %}
+                <li>
+                    <strong>{{ device.name }}</strong>
+                    — {{ device.address }}
+                    ({{ device.device_type }}, RSSI: {{ device.rssi }})
+                </li>
+                {% endfor %}
+            </ul>
+            {% else %}
+            <p>No BLE devices found. Make sure your devices are turned on and in range.</p>
+            {% endif %}
+        {% else %}
+        <p>Press "Scan for Devices" to discover nearby BLE cycling devices.</p>
+        {% endif %}
+    </div>
+</section>
+
+{% if error %}
+<div class="status-message status-message--error" role="alert">{{ error }}</div>
+{% endif %}
+{% endblock %}

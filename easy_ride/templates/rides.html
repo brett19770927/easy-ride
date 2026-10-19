@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% set active_page = "rides" %}
+
+{% block title %}Ride History — Easy Ride{% endblock %}
+{% block heading %}Ride History{% endblock %}
+
+{% block content %}
+{% if rides %}
+<ul class="item-list">
+    {% for ride in rides %}
+    <li>
+        <a href="/ride/{{ ride.id }}">{{ ride.started_at[:10] }}</a>
+        — {{ ride.status }}
+        {% if ride.stats %}
+        , {{ "%.1f"|format(ride.stats.distance / 1000) }} km
+        , {{ ride.stats.avg_power }} W avg
+        {% endif %}
+    </li>
+    {% endfor %}
+</ul>
+{% else %}
+<p>No rides yet. <a href="/routes">Choose a route</a> to start riding.</p>
+{% endif %}
+{% endblock %}

@@ -3,17 +3,19 @@
 Virtual cycling app that simulates GPX routes on smart/dumb trainers via BLE.
 
 ## Project Structure
-Python package `easy_ride/` with five submodules:
+Python package `easy_ride/` with submodules:
 - `gpx/` — GPX parsing, geo math, elevation processing, route pipeline
-- `ble/` — BLE device protocols, simulator, scanner, real BLE trainer/HRM
+- `ble/` — BLE device protocols, simulator, scanner, real BLE trainer/HRM, device factory
 - `ride/` — Physics engine, stats collector, ride engine state machine
-- `api/` — FastAPI app factory, REST endpoints, Pydantic schemas
+- `api/` — FastAPI app factory, REST endpoints, UI routes, Pydantic schemas
 - `strava/` — Strava OAuth client, TCX generation, upload API
+- `templates/` — Jinja2 HTML templates (base layout + 11 page templates)
+- `static/` — CSS (`main.css`) and JS (`ride-live.js`)
 - Top-level: models (dataclasses), exceptions, config, SQLite DB layer
 
 ## Stack
 - Python 3.11+ (use `python3.13` for venv — system Python is 3.9)
-- FastAPI + uvicorn, aiosqlite, python-multipart
+- FastAPI + uvicorn, Jinja2, aiosqlite, python-multipart
 - pycycling (FTMS/CPS/HRM BLE protocols), bleak (BLE scanning/connections)
 - sse-starlette (Server-Sent Events for live ride data)
 - httpx (Strava API client + test transport)
@@ -27,7 +29,7 @@ pip install -e ".[dev]"
 ```
 
 ## Testing
-- `pytest -v` — tests across 18 test files
+- `pytest -v` — 307 tests across 20 test files
 - Tests use `tmp_path` for isolated SQLite DBs
 - API tests manually init DB since `ASGITransport` doesn't trigger ASGI lifespan
 - GPX test fixtures in `tests/fixtures/` (simple_loop.gpx, mountain_climb.gpx)
@@ -95,9 +97,61 @@ pip install -e ".[dev]"
 - Strava tokens stored in user_settings (strava_access_token, strava_refresh_token, strava_expires_at)
 - rides.strava_activity_id tracks which rides have been uploaded
 
+## BLE Device Factory
+- `ble/factory.py` — creates BLE device objects from a `TrainerProfile`
+- `validate_profile(profile)` — checks required addresses per trainer type
+- `build_devices_from_profile(profile)` → `(trainer, hrm | None)` — instantiates but doesn't connect
+- SMART → `FTMSTrainer`, CLASSIC → `BLESpeedCadenceSensor` + optional `BLEPowerMeter` → `ClassicTrainerAdapter`, POWER_METER_ONLY → `BLEPowerMeter` → `ClassicTrainerAdapter`
+- `ProfileValidationError` in `exceptions.py` for missing required addresses
+- `ride_routes._build_devices_from_profile()` calls factory, connects, handles errors (400/503)
+
+## Web UI
+- Server-rendered HTML via Jinja2 templates (no SPA, no JS framework)
+- Templates in `easy_ride/templates/`, static files in `easy_ride/static/`
+- `api/ui_routes.py` — all HTML page route handlers (no `/api` prefix)
+- `api/app.py` mounts `Jinja2Templates` + `StaticFiles`, includes `ui_routes`
+
+### UI Pages
+| Path | Template | Purpose |
+|------|----------|---------|
+| `/` | `dashboard.html` | Recent routes + rides, quick actions |
+| `/routes` | `routes.html` | Route list + GPX upload form |
+| `/routes/{id}` | `route_detail.html` | Route stats, start ride link |
+| `/ride/start` | `ride_start.html` | Mode selection (sim/profile) |
+| `/ride/{id}` | `ride_active.html` or `ride_detail.html` | Active (SSE) or completed |
+| `/rides` | `rides.html` | Ride history |
+| `/settings` | `settings.html` | FTP, weight, Strava |
+| `/profiles` | `profiles.html` | Profile list |
+| `/profiles/new` | `profile_form.html` | Create profile |
+| `/profiles/{id}/edit` | `profile_form.html` | Edit profile |
+| `/devices` | `devices.html` | BLE scan |
+
+### Accessibility
+- Skip-to-content link on every page
+- `<nav aria-label="Main navigation">` with `aria-current="page"`
+- Landmark roles (`banner`, `main`, `contentinfo`)
+- `aria-live="polite"` on live ride data and device scan results
+- Screen reader announcements via `#live-announcer` (`.sr-only`, every 10th update)
+- All form inputs have associated `<label>` elements
+- `aria-describedby` for help text on device address fields
+- 3px orange focus indicators, high-contrast colours
+
+### Live Ride JavaScript
+- `static/js/ride-live.js` — vanilla JS, no dependencies
+- `EventSource` to `/api/rides/{id}/live` for real-time SSE data
+- Updates `#live-power`, `#live-speed`, etc. on each `sample` event
+- Periodic screen reader announcements (every 10th sample)
+- Pause/resume/stop buttons via `fetch()` PATCH to API
+
+## Testing
+- 307 tests across 20 test files
+- `tests/test_ble_factory.py` — 15 tests for device factory + validation
+- `tests/test_ui.py` — 39 tests for all UI pages, accessibility checks, form submission
+
 ## Phases
 - Phase 1 (complete): Project scaffold + GPX processing + API + DB
 - Phase 2 (complete): BLE trainer integration, ride simulation, device protocols
 - Phase 2.5 (complete): Classic/sensor trainer support, trainer profiles, virtual speed model
 - Phase 3 (complete): Strava sync — OAuth, TCX export, upload + status polling, token auto-refresh
-- Phase 4+: Real BLE hardware testing, UI
+- Phase 4 (complete): Web UI (Jinja2 templates, accessible HTML) + real BLE device wiring
+- Phase 5+: Real BLE hardware testing, mobile-responsive refinements
