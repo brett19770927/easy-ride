@@ -80,6 +80,7 @@ class RideMetadataResponse(BaseModel):
     started_at: str
     finished_at: str | None = None
     stats: RideStatsResponse | None = None
+    strava_activity_id: int | None = None
 
 
 class RideDetailResponse(RideMetadataResponse):
@@ -155,3 +156,27 @@ class TrainerProfileResponse(BaseModel):
 
 class TrainerProfileListResponse(BaseModel):
     profiles: list[TrainerProfileResponse]
+
+
+# --- Strava schemas ---
+
+
+class StravaConnectResponse(BaseModel):
+    authorize_url: str
+
+
+class StravaStatusResponse(BaseModel):
+    connected: bool
+    expires_at: int | None = None
+    expired: bool = False
+
+
+class StravaUploadResponse(BaseModel):
+    upload_id: int
+
+
+class StravaUploadStatusResponse(BaseModel):
+    id: int
+    status: str
+    activity_id: int | None = None
+    error: str | None = None

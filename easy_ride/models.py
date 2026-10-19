@@ -80,6 +80,7 @@ class Ride:
     finished_at: Optional[str] = None
     stats: Optional[RideStats] = None
     samples: list[RideSample] = field(default_factory=list)
+    strava_activity_id: Optional[int] = None
 
 
 class TrainerType(Enum):
@@ -111,4 +112,5 @@ class UserSettings:
     hrm_device_id: Optional[str] = None
     strava_access_token: Optional[str] = None
     strava_refresh_token: Optional[str] = None
+    strava_expires_at: Optional[int] = None
     elevation_smoothing_window: int = 5

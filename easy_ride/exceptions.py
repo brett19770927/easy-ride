@@ -67,6 +67,28 @@ class ProfileNotFoundError(EasyRideError):
         super().__init__(f"Trainer profile not found: {profile_id}")
 
 
+class StravaError(EasyRideError):
+    pass
+
+
+class StravaAuthError(StravaError):
+    def __init__(self, message: str = "Strava authentication failed"):
+        super().__init__(message)
+
+
+class StravaUploadError(StravaError):
+    def __init__(self, message: str, status_code: int = 0):
+        self.status_code = status_code
+        super().__init__(message)
+
+
+class StravaNotConfiguredError(StravaError):
+    def __init__(self):
+        super().__init__(
+            "Strava not configured — set STRAVA_CLIENT_ID and STRAVA_CLIENT_SECRET"
+        )
+
+
 class RideStateError(EasyRideError):
     def __init__(self, ride_id: str, current: str, attempted: str):
         self.ride_id = ride_id

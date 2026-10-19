@@ -73,6 +73,7 @@ def _ride_to_metadata(ride) -> RideMetadataResponse:
         started_at=ride.started_at,
         finished_at=ride.finished_at,
         stats=_ride_stats_response(ride.stats),
+        strava_activity_id=ride.strava_activity_id,
     )
 
 
@@ -84,6 +85,7 @@ def _ride_to_detail(ride) -> RideDetailResponse:
         started_at=ride.started_at,
         finished_at=ride.finished_at,
         stats=_ride_stats_response(ride.stats),
+        strava_activity_id=ride.strava_activity_id,
         samples=[
             RideSampleResponse(
                 timestamp=s.timestamp,

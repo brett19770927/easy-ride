@@ -3,11 +3,12 @@
 Virtual cycling app that simulates GPX routes on smart/dumb trainers via BLE.
 
 ## Project Structure
-Python package `easy_ride/` with four submodules:
+Python package `easy_ride/` with five submodules:
 - `gpx/` — GPX parsing, geo math, elevation processing, route pipeline
 - `ble/` — BLE device protocols, simulator, scanner, real BLE trainer/HRM
 - `ride/` — Physics engine, stats collector, ride engine state machine
 - `api/` — FastAPI app factory, REST endpoints, Pydantic schemas
+- `strava/` — Strava OAuth client, TCX generation, upload API
 - Top-level: models (dataclasses), exceptions, config, SQLite DB layer
 
 ## Stack
@@ -15,7 +16,8 @@ Python package `easy_ride/` with four submodules:
 - FastAPI + uvicorn, aiosqlite, python-multipart
 - pycycling (FTMS/CPS/HRM BLE protocols), bleak (BLE scanning/connections)
 - sse-starlette (Server-Sent Events for live ride data)
-- Dev: pytest, pytest-asyncio, pytest-cov, httpx
+- httpx (Strava API client + test transport)
+- Dev: pytest, pytest-asyncio, pytest-cov
 
 ## Setup
 ```
@@ -43,6 +45,12 @@ pip install -e ".[dev]"
   - `/api/rides/{id}/live` — SSE stream (real-time samples + stats)
   - `/api/devices/scan` — BLE device discovery
   - `/api/profiles` — POST create, GET list, GET/{id} detail, PUT/{id} update, DELETE/{id}
+  - `/api/strava/connect` — GET returns Strava OAuth authorize URL
+  - `/api/strava/callback?code=X` — GET handles OAuth redirect, stores tokens
+  - `/api/strava/status` — GET check connection + token expiry
+  - `/api/strava/disconnect` — POST clear stored tokens
+  - `/api/strava/upload/{ride_id}` — POST generate TCX + upload to Strava
+  - `/api/strava/upload/{ride_id}/status?upload_id=X` — GET poll upload status
   - `/api/settings` — GET/PUT user settings (FTP, weight, device IDs)
 
 ## Conventions
@@ -70,14 +78,26 @@ pip install -e ".[dev]"
 - API: `/api/profiles` — POST/GET/GET{id}/PUT{id}/DELETE{id}
 - Ride start uses profile to build device chain (or simulator with `simulator_mode=smart|classic`)
 
+## Strava Integration
+- OAuth 2.0 flow: connect → callback → store tokens (access, refresh, expires_at)
+- Token auto-refresh: `_ensure_valid_token()` checks expiry (60s buffer) and refreshes before API calls
+- Strava rotates refresh tokens on each refresh — always save the new one immediately
+- TCX generation: `generate_tcx(ride, route)` → XML string with trackpoints, position, power, HR, cadence
+- Upload flow: generate TCX → POST multipart to Strava → poll upload status → save activity_id
+- Guards: ride must be completed (400), not already uploaded (409), Strava connected (401), configured (400)
+- Config: `STRAVA_CLIENT_ID` + `STRAVA_CLIENT_SECRET` env vars required
+
 ## Database
-- Schema version 3 (auto-migrates from v1/v2)
+- Schema version 4 (auto-migrates from v1/v2/v3)
 - Tables: routes, route_points, rides, ride_samples, user_settings, trainer_profiles, schema_version
 - ride_samples has composite PK (ride_id, idx) with CASCADE delete
 - Settings stored as key-value pairs, loaded into `UserSettings` dataclass
+- Strava tokens stored in user_settings (strava_access_token, strava_refresh_token, strava_expires_at)
+- rides.strava_activity_id tracks which rides have been uploaded
 
 ## Phases
 - Phase 1 (complete): Project scaffold + GPX processing + API + DB
 - Phase 2 (complete): BLE trainer integration, ride simulation, device protocols
 - Phase 2.5 (complete): Classic/sensor trainer support, trainer profiles, virtual speed model
-- Phase 3+: Strava sync, real BLE hardware testing, UI
+- Phase 3 (complete): Strava sync — OAuth, TCX export, upload + status polling, token auto-refresh
+- Phase 4+: Real BLE hardware testing, UI

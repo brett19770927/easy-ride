@@ -24,7 +24,7 @@ from easy_ride.models import (
     UserSettings,
 )
 
-SCHEMA_VERSION = 3
+SCHEMA_VERSION = 4
 
 SCHEMA_SQL = """
 CREATE TABLE IF NOT EXISTS schema_version (
@@ -133,6 +133,11 @@ CREATE TABLE IF NOT EXISTS trainer_profiles (
 """
 
 
+MIGRATION_V4 = """
+ALTER TABLE rides ADD COLUMN strava_activity_id INTEGER;
+"""
+
+
 async def init_db(db: aiosqlite.Connection) -> None:
     await db.executescript(SCHEMA_SQL)
     cursor = await db.execute("SELECT version FROM schema_version")
@@ -142,12 +147,15 @@ async def init_db(db: aiosqlite.Connection) -> None:
             "INSERT INTO schema_version (version) VALUES (?)", (SCHEMA_VERSION,)
         )
         await db.executescript(MIGRATION_V3)
+        await db.executescript(MIGRATION_V4)
     else:
         current = row[0] if isinstance(row[0], int) else row["version"]
         if current < 2:
             await db.executescript(MIGRATION_V2)
         if current < 3:
             await db.executescript(MIGRATION_V3)
+        if current < 4:
+            await db.executescript(MIGRATION_V4)
         if current < SCHEMA_VERSION:
             await db.execute(
                 "UPDATE schema_version SET version = ?", (SCHEMA_VERSION,)
@@ -413,6 +421,7 @@ async def fetch_ride(db: aiosqlite.Connection, ride_id: str) -> Ride:
         finished_at=row["finished_at"],
         stats=stats,
         samples=samples,
+        strava_activity_id=row["strava_activity_id"],
     )
 
 
@@ -434,6 +443,7 @@ async def fetch_ride_metadata(db: aiosqlite.Connection, ride_id: str) -> Ride:
         finished_at=row["finished_at"],
         stats=stats,
         samples=[],
+        strava_activity_id=row["strava_activity_id"],
     )
 
 
@@ -453,6 +463,7 @@ async def list_rides(db: aiosqlite.Connection) -> list[Ride]:
             finished_at=row["finished_at"],
             stats=stats,
             samples=[],
+            strava_activity_id=row["strava_activity_id"],
         ))
     return result
 
@@ -462,6 +473,25 @@ async def delete_ride(db: aiosqlite.Connection, ride_id: str) -> None:
     if await cursor.fetchone() is None:
         raise RideNotFoundError(ride_id)
     await db.execute("DELETE FROM rides WHERE id = ?", (ride_id,))
+    await db.commit()
+
+
+async def set_ride_strava_activity(
+    db: aiosqlite.Connection, ride_id: str, activity_id: int
+) -> None:
+    cursor = await db.execute("SELECT id FROM rides WHERE id = ?", (ride_id,))
+    if await cursor.fetchone() is None:
+        raise RideNotFoundError(ride_id)
+    await db.execute(
+        "UPDATE rides SET strava_activity_id = ? WHERE id = ?",
+        (activity_id, ride_id),
+    )
+    await db.commit()
+
+
+async def clear_strava_tokens(db: aiosqlite.Connection) -> None:
+    for key in ("strava_access_token", "strava_refresh_token", "strava_expires_at"):
+        await db.execute("DELETE FROM user_settings WHERE key = ?", (key,))
     await db.commit()
 
 
@@ -596,6 +626,7 @@ async def get_settings(db: aiosqlite.Connection) -> UserSettings:
         hrm_device_id=data.get("hrm_device_id"),
         strava_access_token=data.get("strava_access_token"),
         strava_refresh_token=data.get("strava_refresh_token"),
+        strava_expires_at=int(data["strava_expires_at"]) if data.get("strava_expires_at") else None,
         elevation_smoothing_window=int(data.get("elevation_smoothing_window", "5")),
     )
 
@@ -614,6 +645,8 @@ async def save_settings(db: aiosqlite.Connection, settings: UserSettings) -> Non
         pairs["strava_access_token"] = settings.strava_access_token
     if settings.strava_refresh_token is not None:
         pairs["strava_refresh_token"] = settings.strava_refresh_token
+    if settings.strava_expires_at is not None:
+        pairs["strava_expires_at"] = str(settings.strava_expires_at)
 
     for key, value in pairs.items():
         await db.execute(

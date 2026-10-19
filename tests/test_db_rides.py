@@ -3,6 +3,7 @@ from __future__ import annotations
 import pytest
 
 from easy_ride.db import (
+    clear_strava_tokens,
     connect_db,
     delete_ride,
     fetch_ride,
@@ -13,6 +14,7 @@ from easy_ride.db import (
     insert_route,
     list_rides,
     save_settings,
+    set_ride_strava_activity,
     update_ride_status,
 )
 from easy_ride.exceptions import RideNotFoundError
@@ -186,3 +188,67 @@ class TestSettingsCRUD:
         loaded = await get_settings(db)
         assert loaded.trainer_device_id == "AA:BB:CC:DD:EE:FF"
         assert loaded.hrm_device_id == "11:22:33:44:55:66"
+
+
+class TestStravaActivityId:
+    async def test_ride_strava_activity_id_default_none(self, db, sample_route):
+        await insert_route(db, sample_route)
+        ride = _make_ride(sample_route.id)
+        await insert_ride(db, ride)
+        fetched = await fetch_ride(db, "ride-1")
+        assert fetched.strava_activity_id is None
+
+    async def test_set_and_fetch_strava_activity_id(self, db, sample_route):
+        await insert_route(db, sample_route)
+        ride = _make_ride(sample_route.id)
+        await insert_ride(db, ride)
+        await set_ride_strava_activity(db, "ride-1", 12345678)
+        fetched = await fetch_ride(db, "ride-1")
+        assert fetched.strava_activity_id == 12345678
+
+    async def test_strava_activity_id_in_metadata(self, db, sample_route):
+        await insert_route(db, sample_route)
+        ride = _make_ride(sample_route.id)
+        await insert_ride(db, ride)
+        await set_ride_strava_activity(db, "ride-1", 99999)
+        fetched = await fetch_ride_metadata(db, "ride-1")
+        assert fetched.strava_activity_id == 99999
+
+    async def test_strava_activity_id_in_list(self, db, sample_route):
+        await insert_route(db, sample_route)
+        ride = _make_ride(sample_route.id)
+        await insert_ride(db, ride)
+        await set_ride_strava_activity(db, "ride-1", 55555)
+        rides = await list_rides(db)
+        assert rides[0].strava_activity_id == 55555
+
+    async def test_set_strava_activity_nonexistent_ride(self, db):
+        with pytest.raises(RideNotFoundError):
+            await set_ride_strava_activity(db, "nonexistent", 12345)
+
+
+class TestStravaTokens:
+    async def test_strava_tokens_roundtrip(self, db):
+        settings = UserSettings(
+            strava_access_token="access_abc",
+            strava_refresh_token="refresh_xyz",
+            strava_expires_at=1700000000,
+        )
+        await save_settings(db, settings)
+        loaded = await get_settings(db)
+        assert loaded.strava_access_token == "access_abc"
+        assert loaded.strava_refresh_token == "refresh_xyz"
+        assert loaded.strava_expires_at == 1700000000
+
+    async def test_clear_strava_tokens(self, db):
+        settings = UserSettings(
+            strava_access_token="access_abc",
+            strava_refresh_token="refresh_xyz",
+            strava_expires_at=1700000000,
+        )
+        await save_settings(db, settings)
+        await clear_strava_tokens(db)
+        loaded = await get_settings(db)
+        assert loaded.strava_access_token is None
+        assert loaded.strava_refresh_token is None
+        assert loaded.strava_expires_at is None
